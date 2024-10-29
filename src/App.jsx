@@ -2,13 +2,18 @@ import { createSignal, onMount, createEffect, Show } from 'solid-js';
 import { supabase, createEvent } from './supabaseClient';
 import { Auth } from '@supabase/auth-ui-solid';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { CodeMirror } from 'solid-codemirror';
+import 'codemirror/lib/codemirror.css';
+import 'codemirror/mode/htmlmixed/htmlmixed.js';
 
 function App() {
   const [user, setUser] = createSignal(null);
   const [currentPage, setCurrentPage] = createSignal('login');
   const [websiteRequirements, setWebsiteRequirements] = createSignal('');
   const [generatedWebsite, setGeneratedWebsite] = createSignal('');
+  const [editedWebsite, setEditedWebsite] = createSignal('');
   const [loading, setLoading] = createSignal(false);
+  const [previewMode, setPreviewMode] = createSignal(false);
 
   // Check if user is signed in on mount
   const checkUserSignedIn = async () => {
@@ -52,10 +57,16 @@ function App() {
 
     try {
       const result = await createEvent('chatgpt_request', {
-        prompt: `من فضلك قم بإنشاء موقع ويب احترافي بناءً على المتطلبات التالية:\n\n${websiteRequirements()}\n\nيجب أن يكون الموقع بتنسيق HTML كامل، ويحتوي على أقسام منظمة ومرتبة بشكل صحيح.`,
+        prompt: `من فضلك قم بإنشاء موقع ويب احترافي وكامل بناءً على المتطلبات التالية باللغة العربية، بدون أخطاء. قم بمراجعة وتصحيح أي أخطاء قبل تسليم الكود:
+
+${websiteRequirements()}
+
+يجب أن يكون الموقع بتنسيق HTML كامل ومدعوم بـ CSS، ويحتوي على أقسام منظمة ومرتبة بشكل صحيح.`,
         response_type: 'text'
       });
       setGeneratedWebsite(result);
+      setEditedWebsite(result);
+      setPreviewMode(false);
     } catch (error) {
       console.error('Error generating website:', error);
     } finally {
@@ -84,9 +95,8 @@ function App() {
                 appearance={{ theme: ThemeSupa }}
                 providers={['google', 'facebook', 'apple']}
                 magicLink={true}
-                view="magic_link"
                 showLinks={false}
-                authView="magic_link"
+                view="magic_link"
               />
             </div>
           </div>
@@ -121,12 +131,37 @@ function App() {
           </form>
           <Show when={generatedWebsite()}>
             <div class="mt-8">
-              <h2 class="text-2xl font-bold mb-4 text-purple-600">الموقع الذي تم إنشاؤه</h2>
-              <iframe
-                srcDoc={generatedWebsite()}
-                class="w-full h-[600px] border border-gray-300 rounded-lg"
-                sandbox="allow-scripts allow-same-origin"
-              ></iframe>
+              <h2 class="text-2xl font-bold mb-4 text-purple-600">مراجعة وتصحيح الموقع</h2>
+              <div class="flex space-x-4 mb-4">
+                <button
+                  class={`px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-300 ease-in-out transform hover:scale-105 cursor-pointer ${previewMode() ? '' : 'opacity-50 cursor-not-allowed'}`}
+                  onClick={() => setPreviewMode(false)}
+                  disabled={loading() || !previewMode()}
+                >
+                  تحرير الكود
+                </button>
+                <button
+                  class={`px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-300 ease-in-out transform hover:scale-105 cursor-pointer ${previewMode() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => setPreviewMode(true)}
+                  disabled={loading() || previewMode()}
+                >
+                  معاينة الموقع
+                </button>
+              </div>
+              <Show when={!previewMode()}>
+                <CodeMirror
+                  value={editedWebsite()}
+                  onValueChange={(value) => setEditedWebsite(value)}
+                  options={{ mode: 'htmlmixed', theme: 'default', lineNumbers: true }}
+                />
+              </Show>
+              <Show when={previewMode()}>
+                <iframe
+                  srcDoc={editedWebsite()}
+                  class="w-full h-[600px] border border-gray-300 rounded-lg"
+                  sandbox="allow-scripts allow-same-origin"
+                ></iframe>
+              </Show>
             </div>
           </Show>
         </div>
